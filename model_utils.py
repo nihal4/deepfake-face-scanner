@@ -96,7 +96,20 @@ def load_session() -> ort.InferenceSession:
     _session = ort.InferenceSession(MODEL_PATH, sess_options=so, providers=providers)
     _input_name = _session.get_inputs()[0].name
     _output_name = _session.get_outputs()[0].name
-    logger.info("Model loaded. input=%s output=%s", _input_name, _output_name)
+
+    in_info = _session.get_inputs()[0]
+    out_info = _session.get_outputs()[0]
+    logger.info(
+        "Model loaded. input=%s shape=%s dtype=%s | output=%s shape=%s dtype=%s",
+        in_info.name, in_info.shape, in_info.type,
+        out_info.name, out_info.shape, out_info.type,
+    )
+    if len(_session.get_outputs()) > 1:
+        logger.warning(
+            "Model has %d outputs; only using the first one (%s). "
+            "If the real prediction is a different output, this needs updating.",
+            len(_session.get_outputs()), _output_name,
+        )
     return _session
 
 
@@ -118,21 +131,61 @@ def _sigmoid(x: np.ndarray) -> np.ndarray:
     return 1.0 / (1.0 + np.exp(-x))
 
 
+def _softmax(x: np.ndarray) -> np.ndarray:
+    e = np.exp(x - np.max(x))
+    return e / e.sum()
+
+
 def predict(image: Image.Image) -> dict:
-    """Runs the model on a PIL image and returns a result dict."""
+    """Runs the model on a PIL image and returns a result dict.
+
+    Handles a few possible output shapes defensively, since the exported
+    model's actual output doesn't always match what was assumed at design
+    time:
+      - size 1  -> single sigmoid/logit for P(fake)
+      - size 2  -> two-class output, class order [fake, real] (index 0 =
+                   fake, index 1 = real), as either softmax probabilities
+                   or raw logits
+      - other   -> logged and rejected with a clear error, rather than
+                   silently producing a meaningless number
+    """
     session = load_session()
     tensor = preprocess_image(image)
 
     raw = session.run([_output_name], {_input_name: tensor})[0]
-    raw_value = float(np.squeeze(raw))
+    flat = np.asarray(raw).astype(np.float64).reshape(-1)
+    logger.info("Raw model output shape=%s values=%s", raw.shape, flat)
 
-    # The model was exported with a single sigmoid output. Some exports emit
-    # raw logits instead of post-sigmoid probabilities; if the value falls
-    # outside [0, 1] we apply sigmoid ourselves as a safety net.
-    if raw_value < 0.0 or raw_value > 1.0:
-        fake_prob = float(_sigmoid(np.array(raw_value)))
+    if flat.size == 1:
+        raw_value = float(flat[0])
+        # Some exports emit raw logits instead of post-sigmoid probabilities;
+        # if the value falls outside [0, 1] we apply sigmoid ourselves.
+        if raw_value < 0.0 or raw_value > 1.0:
+            fake_prob = float(_sigmoid(np.array(raw_value)))
+        else:
+            fake_prob = raw_value
+
+    elif flat.size == 2:
+        # Model's class order is [fake, real] (confirmed by user: 0=fake, 1=real).
+        # If probabilities already look like they sum to ~1, treat them as-is;
+        # otherwise treat as logits and apply softmax.
+        if abs(flat.sum() - 1.0) < 1e-3 and flat.min() >= 0.0 and flat.max() <= 1.0:
+            probs = flat
+        else:
+            probs = _softmax(flat)
+        fake_prob = float(probs[0])
+
     else:
-        fake_prob = raw_value
+        logger.error(
+            "Unexpected model output size=%d shape=%s values=%s — "
+            "don't know how to interpret this, update predict() to match "
+            "the model's real output format.",
+            flat.size, raw.shape, flat,
+        )
+        raise ValueError(
+            f"Unexpected model output shape {raw.shape} (size {flat.size}); "
+            "expected a single value or a 2-class output."
+        )
 
     is_fake = fake_prob >= FAKE_THRESHOLD
     label = "fake" if is_fake else "real"
