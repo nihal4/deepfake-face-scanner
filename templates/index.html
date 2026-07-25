@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Face Authenticity Scanner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="grid-overlay"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">◈</span>
+    <span class="brand-text">FACE&nbsp;AUTH&nbsp;<span class="dim">/ SCANNER</span></span>
+  </div>
+  <div class="topbar-meta">SE334 &middot; MODEL: HYBRID-ONNX &middot; MODE: LOCAL INFERENCE</div>
+</header>
+
+<main class="stage">
+
+  <section class="intro">
+    <h1>Is this face <span class="verdict-word real">real</span> or <span class="verdict-word fake">fabricated</span>?</h1>
+    <p class="sub">Upload a face photo. The scanner runs it through a fine-tuned hybrid CNN classifier and reports a fake-probability score &mdash; no image leaves this server after inference.</p>
+  </section>
+
+  <section class="panel">
+
+    <div class="dropzone" id="dropzone">
+      <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp,image/bmp" hidden>
+
+      <div class="dz-idle" id="dzIdle">
+        <div class="dz-icon">＋</div>
+        <p class="dz-title">Drop a face image here</p>
+        <p class="dz-hint">or click to browse &middot; JPG, PNG, WEBP &middot; up to 10&nbsp;MB</p>
+      </div>
+
+      <div class="dz-preview" id="dzPreview" hidden>
+        <img id="previewImg" alt="Uploaded face preview">
+        <div class="scan-line" id="scanLine"></div>
+        <div class="scan-label" id="scanLabel">ANALYZING</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="analyzeBtn" disabled>Run Scan</button>
+      <button class="btn btn-ghost" id="resetBtn" hidden>Scan Another</button>
+    </div>
+
+    <div class="error" id="errorBox" hidden></div>
+
+    <div class="result" id="resultBox" hidden>
+      <div class="result-verdict">
+        <span class="result-label">VERDICT</span>
+        <span class="result-value" id="resultVerdict">&mdash;</span>
+      </div>
+
+      <div class="meter">
+        <div class="meter-track">
+          <div class="meter-fill" id="meterFill"></div>
+          <div class="meter-threshold" id="meterThreshold"></div>
+        </div>
+        <div class="meter-labels">
+          <span>REAL</span>
+          <span>FAKE</span>
+        </div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <span class="metric-label">Fake probability</span>
+          <span class="metric-value" id="metricFake">&mdash;</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Real probability</span>
+          <span class="metric-value" id="metricReal">&mdash;</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Confidence</span>
+          <span class="metric-value" id="metricConfidence">&mdash;</span>
+        </div>
+      </div>
+
+      <p class="disclaimer">Course-project classifier, evaluated on in-distribution data only. Treat results as indicative, not forensic proof.</p>
+    </div>
+
+  </section>
+
+  <footer class="foot">Detecting Deepfake Faces &mdash; Daffodil International University &middot; Dept. of Software Engineering</footer>
+
+</main>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

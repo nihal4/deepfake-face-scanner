@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: deepfake-face-scanner
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --preload --workers 1 --threads 4 --timeout 180 --bind 0.0.0.0:$PORT app:app
+    healthCheckPath: /health
+    envVars:
+      - key: MODEL_URL
+        value: https://huggingface.co/nihal4/Deep_Fake_Hybrid_Model/resolve/main/deepfake_hybrid_final.onnx
+      - key: MODEL_DATA_URL
+        value: https://huggingface.co/nihal4/Deep_Fake_Hybrid_Model/resolve/main/deepfake_hybrid_final.onnx.data
+      - key: MODEL_DIR
+        value: models
+      - key: MODEL_FILENAME
+        value: deepfake_hybrid_final.onnx
+      - key: MODEL_DATA_FILENAME
+        value: deepfake_hybrid_final.onnx.data
+      - key: IMG_SIZE
+        value: "260"
+      - key: IMAGENET_MEAN
+        value: "0.485,0.456,0.406"
+      - key: IMAGENET_STD
+        value: "0.229,0.224,0.225"
+      - key: FAKE_THRESHOLD
+        value: "0.5"
+      - key: MAX_CONTENT_LENGTH_MB
+        value: "10"
